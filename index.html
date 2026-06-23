@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Wav Mastering Studio</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="workspace" aria-labelledby="app-title">
+        <div class="header">
+          <div>
+            <p class="eyebrow">Local WAV Mastering</p>
+            <h1 id="app-title">Wav Mastering Studio</h1>
+          </div>
+          <div class="meter" aria-label="output loudness">
+            <span>Output</span>
+            <strong id="levelText">-</strong>
+          </div>
+        </div>
+
+        <div class="drop-zone" id="dropZone">
+          <input id="fileInput" type="file" accept="audio/wav,audio/x-wav" />
+          <div class="drop-copy">
+            <span class="file-icon" aria-hidden="true">WAV</span>
+            <div>
+              <h2>WAVファイルを選ぶ</h2>
+              <p id="fileStatus">ファイルは外に送らず、このブラウザの中だけで処理します。</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="visuals" aria-label="waveform preview">
+          <canvas id="inputCanvas" width="900" height="160"></canvas>
+          <canvas id="outputCanvas" width="900" height="160"></canvas>
+        </div>
+
+        <section class="controls" aria-label="mastering controls">
+          <div class="preset-group" role="radiogroup" aria-label="mastering preset">
+            <button class="preset is-active" data-preset="balanced" type="button">
+              <span>Balanced</span>
+              <small>自然に整える</small>
+            </button>
+            <button class="preset" data-preset="warm" type="button">
+              <span>Warm</span>
+              <small>少し太くする</small>
+            </button>
+            <button class="preset" data-preset="punchy" type="button">
+              <span>Punchy</span>
+              <small>前に出す</small>
+            </button>
+            <button class="preset" data-preset="loud" type="button">
+              <span>Loud</span>
+              <small>音圧を上げる</small>
+            </button>
+          </div>
+
+          <div class="sliders">
+            <label>
+              <span>Brightness</span>
+              <input id="brightness" type="range" min="-6" max="6" value="1.5" step="0.5" />
+            </label>
+            <label>
+              <span>Warmth</span>
+              <input id="warmth" type="range" min="-6" max="6" value="1" step="0.5" />
+            </label>
+            <label>
+              <span>Glue</span>
+              <input id="glue" type="range" min="0" max="10" value="4" step="1" />
+            </label>
+            <label>
+              <span>Output Ceiling</span>
+              <input id="ceiling" type="range" min="-3" max="-0.5" value="-1" step="0.1" />
+            </label>
+          </div>
+        </section>
+
+        <div class="actions">
+          <button id="processButton" type="button" disabled>Master WAV</button>
+          <button id="demoButton" class="secondary" type="button">Load Demo</button>
+          <button id="playInputButton" class="secondary" type="button" disabled>Play Original</button>
+          <button id="playOutputButton" class="secondary" type="button" disabled>Play Mastered</button>
+          <a id="downloadLink" class="download" aria-disabled="true">Download WAV</a>
+        </div>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

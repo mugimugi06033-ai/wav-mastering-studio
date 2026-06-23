@@ -1,0 +1,288 @@
+:root {
+  color-scheme: dark;
+  --bg: #171914;
+  --panel: #24261f;
+  --panel-2: #303328;
+  --line: #555a48;
+  --text: #f5f1e7;
+  --muted: #b8b29f;
+  --accent: #f0c05a;
+  --accent-2: #7ec7a3;
+  --danger: #e36d5d;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  background:
+    linear-gradient(130deg, rgba(126, 199, 163, 0.12), transparent 34%),
+    linear-gradient(320deg, rgba(240, 192, 90, 0.13), transparent 38%),
+    var(--bg);
+  color: var(--text);
+}
+
+button,
+input,
+a {
+  font: inherit;
+}
+
+.shell {
+  min-height: 100vh;
+  padding: 32px;
+  display: grid;
+  place-items: center;
+}
+
+.workspace {
+  width: min(1120px, 100%);
+  display: grid;
+  gap: 22px;
+}
+
+.header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  color: var(--accent-2);
+  font-size: 0.78rem;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: clamp(2rem, 7vw, 5.4rem);
+  line-height: 0.94;
+  letter-spacing: 0;
+}
+
+.meter {
+  min-width: 130px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  background: rgba(36, 38, 31, 0.78);
+  text-align: right;
+}
+
+.meter span,
+.drop-zone p,
+.sliders span,
+.preset small {
+  color: var(--muted);
+}
+
+.meter strong {
+  display: block;
+  font-size: 1.45rem;
+}
+
+.drop-zone {
+  position: relative;
+  min-height: 148px;
+  display: grid;
+  align-items: center;
+  padding: 24px;
+  border: 1px dashed var(--line);
+  background: rgba(36, 38, 31, 0.72);
+}
+
+.drop-zone.is-hover {
+  border-color: var(--accent);
+  background: rgba(48, 51, 40, 0.9);
+}
+
+.drop-zone input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.drop-copy {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  pointer-events: none;
+}
+
+.file-icon {
+  width: 72px;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-weight: 800;
+}
+
+.drop-copy h2 {
+  font-size: 1.45rem;
+}
+
+.drop-copy p {
+  margin-top: 6px;
+}
+
+.visuals {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+canvas {
+  width: 100%;
+  aspect-ratio: 900 / 160;
+  min-height: 128px;
+  border: 1px solid var(--line);
+  background: #10120e;
+}
+
+.controls {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.05fr) minmax(300px, 1fr);
+  gap: 16px;
+}
+
+.preset-group {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.preset,
+.actions button,
+.download {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.preset {
+  min-height: 74px;
+  padding: 12px;
+  text-align: left;
+}
+
+.preset span {
+  display: block;
+  font-weight: 800;
+}
+
+.preset small {
+  display: block;
+  margin-top: 4px;
+}
+
+.preset.is-active {
+  border-color: var(--accent);
+  background: #3a3321;
+}
+
+.sliders {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  background: rgba(36, 38, 31, 0.78);
+}
+
+.sliders label {
+  display: grid;
+  gap: 8px;
+}
+
+input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.actions button,
+.download {
+  min-height: 48px;
+  padding: 0 18px;
+  display: inline-grid;
+  place-items: center;
+  text-decoration: none;
+}
+
+#processButton {
+  min-width: 150px;
+  background: var(--accent);
+  color: #17140b;
+  border-color: var(--accent);
+  font-weight: 800;
+}
+
+.secondary {
+  min-width: 130px;
+}
+
+.download {
+  min-width: 150px;
+  color: #0d1b15;
+  background: var(--accent-2);
+  border-color: var(--accent-2);
+  font-weight: 800;
+}
+
+button:disabled,
+.download[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+@media (max-width: 780px) {
+  .shell {
+    padding: 18px;
+    place-items: start;
+  }
+
+  .header,
+  .drop-copy {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .meter {
+    text-align: left;
+  }
+
+  .visuals,
+  .controls {
+    grid-template-columns: 1fr;
+  }
+
+  .preset-group {
+    grid-template-columns: 1fr;
+  }
+
+  .actions > * {
+    flex: 1 1 180px;
+  }
+}
