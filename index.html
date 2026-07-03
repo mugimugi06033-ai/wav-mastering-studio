@@ -14,9 +14,16 @@
             <p class="eyebrow">Local WAV Mastering</p>
             <h1 id="app-title">Wav Mastering Studio</h1>
           </div>
-          <div class="meter" aria-label="output loudness">
-            <span>Output</span>
-            <strong id="levelText">-</strong>
+          <div class="meter-grid" aria-label="mastering meters">
+            <div class="meter">
+              <span>Peak</span>
+              <strong id="levelText">-</strong>
+            </div>
+            <div class="meter">
+              <span>Limiter GR</span>
+              <strong id="reductionText">-</strong>
+              <div class="meter-bar" aria-hidden="true"><i id="reductionBar"></i></div>
+            </div>
           </div>
         </div>
 
@@ -40,7 +47,7 @@
           <div class="preset-group" role="radiogroup" aria-label="mastering preset">
             <button class="preset is-active" data-preset="balanced" type="button">
               <span>Balanced</span>
-              <small>自然に整える</small>
+              <small>余裕を残して整える</small>
             </button>
             <button class="preset" data-preset="warm" type="button">
               <span>Warm</span>
@@ -52,35 +59,49 @@
             </button>
             <button class="preset" data-preset="loud" type="button">
               <span>Loud</span>
-              <small>音圧を上げる</small>
+              <small>自然に音圧を上げる</small>
+            </button>
+            <button class="preset" data-preset="streaming" type="button">
+              <span>Streaming</span>
+              <small>配信用に余裕を残す</small>
             </button>
           </div>
 
           <div class="sliders">
             <label>
               <span>Brightness</span>
-              <input id="brightness" type="range" min="-6" max="6" value="1.5" step="0.5" />
+              <input id="brightness" type="range" min="-6" max="6" value="0.5" step="0.5" />
             </label>
             <label>
               <span>Warmth</span>
-              <input id="warmth" type="range" min="-6" max="6" value="1" step="0.5" />
+              <input id="warmth" type="range" min="-6" max="6" value="0.8" step="0.5" />
             </label>
             <label>
               <span>Glue</span>
-              <input id="glue" type="range" min="0" max="10" value="4" step="1" />
+              <input id="glue" type="range" min="0" max="10" value="3" step="1" />
             </label>
             <label>
               <span>Output Ceiling</span>
-              <input id="ceiling" type="range" min="-3" max="-0.5" value="-1" step="0.1" />
+              <input id="ceiling" type="range" min="-3" max="-0.5" value="-1.4" step="0.1" />
             </label>
+          </div>
+        </section>
+
+        <section class="compare" aria-label="A B comparison controls">
+          <div class="ab-switch" role="group" aria-label="source monitor">
+            <button id="monitorOriginal" class="is-active" type="button" disabled>Original</button>
+            <button id="monitorMastered" type="button" disabled>Mastered</button>
+          </div>
+          <div class="transport">
+            <button id="playToggleButton" type="button" disabled>Play</button>
+            <input id="seekBar" type="range" min="0" max="1000" value="0" step="1" disabled />
+            <span id="timeText">0:00 / 0:00</span>
           </div>
         </section>
 
         <div class="actions">
           <button id="processButton" type="button" disabled>Master WAV</button>
           <button id="demoButton" class="secondary" type="button">Load Demo</button>
-          <button id="playInputButton" class="secondary" type="button" disabled>Play Original</button>
-          <button id="playOutputButton" class="secondary" type="button" disabled>Play Mastered</button>
           <a id="downloadLink" class="download" aria-disabled="true">Download WAV</a>
         </div>
       </section>

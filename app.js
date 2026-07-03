@@ -1,8 +1,9 @@
 const presets = {
-  balanced: { brightness: 1.5, warmth: 1, glue: 4, ceiling: -1 },
-  warm: { brightness: -0.5, warmth: 3.5, glue: 3, ceiling: -1.2 },
-  punchy: { brightness: 2, warmth: 1.5, glue: 6, ceiling: -0.9 },
-  loud: { brightness: 3, warmth: 1, glue: 8, ceiling: -0.7 },
+  balanced: { brightness: 0.5, warmth: 0.8, glue: 3, ceiling: -1.4 },
+  warm: { brightness: -0.8, warmth: 2.8, glue: 3, ceiling: -1.5 },
+  punchy: { brightness: 0.8, warmth: 1.2, glue: 5, ceiling: -1.2 },
+  loud: { brightness: 1.0, warmth: 0.6, glue: 6, ceiling: -1.1 },
+  streaming: { brightness: 0, warmth: 0.7, glue: 2, ceiling: -1.8 },
 };
 
 const fileInput = document.querySelector("#fileInput");
@@ -10,10 +11,15 @@ const dropZone = document.querySelector("#dropZone");
 const fileStatus = document.querySelector("#fileStatus");
 const processButton = document.querySelector("#processButton");
 const demoButton = document.querySelector("#demoButton");
-const playInputButton = document.querySelector("#playInputButton");
-const playOutputButton = document.querySelector("#playOutputButton");
+const playToggleButton = document.querySelector("#playToggleButton");
+const monitorOriginal = document.querySelector("#monitorOriginal");
+const monitorMastered = document.querySelector("#monitorMastered");
+const seekBar = document.querySelector("#seekBar");
+const timeText = document.querySelector("#timeText");
 const downloadLink = document.querySelector("#downloadLink");
 const levelText = document.querySelector("#levelText");
+const reductionText = document.querySelector("#reductionText");
+const reductionBar = document.querySelector("#reductionBar");
 const inputCanvas = document.querySelector("#inputCanvas");
 const outputCanvas = document.querySelector("#outputCanvas");
 const sliders = {
@@ -28,12 +34,130 @@ let sourceBuffer;
 let masteredBuffer;
 let currentObjectUrl;
 let currentSource;
+let isPlaying = false;
+let activeMonitor = "original";
+let playbackOffset = 0;
+let playbackStartedAt = 0;
+let seekTimer;
+let lastAnalysis = null;
 
 function getAudioContext() {
   if (!audioContext) {
     audioContext = new AudioContext();
   }
   return audioContext;
+}
+
+function dbToGain(db) {
+  return 10 ** (db / 20);
+}
+
+function gainToDb(gain) {
+  return 20 * Math.log10(Math.max(gain, 0.000001));
+}
+
+function getCurrentBuffer() {
+  return activeMonitor === "mastered" && masteredBuffer ? masteredBuffer : sourceBuffer;
+}
+
+function formatTime(seconds) {
+  const safeSeconds = Math.max(0, Number.isFinite(seconds) ? seconds : 0);
+  const minutes = Math.floor(safeSeconds / 60);
+  const rest = Math.floor(safeSeconds % 60).toString().padStart(2, "0");
+  return `${minutes}:${rest}`;
+}
+
+function currentPosition() {
+  const buffer = getCurrentBuffer();
+  if (!buffer) return 0;
+  if (!isPlaying) return playbackOffset;
+  const context = getAudioContext();
+  return Math.min(buffer.duration, playbackOffset + context.currentTime - playbackStartedAt);
+}
+
+function updateTransport() {
+  const buffer = getCurrentBuffer();
+  const position = currentPosition();
+  if (!buffer) {
+    seekBar.value = 0;
+    timeText.textContent = "0:00 / 0:00";
+    return;
+  }
+
+  seekBar.value = buffer.duration > 0 ? Math.round((position / buffer.duration) * 1000) : 0;
+  timeText.textContent = `${formatTime(position)} / ${formatTime(buffer.duration)}`;
+}
+
+function startSeekTimer() {
+  clearInterval(seekTimer);
+  seekTimer = setInterval(updateTransport, 120);
+}
+
+function stopSeekTimer() {
+  clearInterval(seekTimer);
+  seekTimer = null;
+}
+
+function stopCurrentPlayback(keepOffset = true) {
+  if (keepOffset) {
+    playbackOffset = currentPosition();
+  }
+  if (currentSource) {
+    currentSource.onended = null;
+    currentSource.stop();
+    currentSource.disconnect();
+    currentSource = null;
+  }
+  isPlaying = false;
+  playToggleButton.textContent = "Play";
+  stopSeekTimer();
+  updateTransport();
+}
+
+async function playFrom(offset = playbackOffset) {
+  const buffer = getCurrentBuffer();
+  if (!buffer) return;
+
+  stopCurrentPlayback(false);
+  const context = getAudioContext();
+  await context.resume();
+  playbackOffset = Math.min(Math.max(offset, 0), Math.max(buffer.duration - 0.05, 0));
+  playbackStartedAt = context.currentTime;
+
+  const source = context.createBufferSource();
+  source.buffer = buffer;
+  source.connect(context.destination);
+  source.start(0, playbackOffset);
+  source.onended = () => {
+    if (currentSource !== source) return;
+    playbackOffset = 0;
+    currentSource = null;
+    isPlaying = false;
+    playToggleButton.textContent = "Play";
+    stopSeekTimer();
+    updateTransport();
+  };
+
+  currentSource = source;
+  isPlaying = true;
+  playToggleButton.textContent = "Pause";
+  startSeekTimer();
+  updateTransport();
+}
+
+async function setMonitor(nextMonitor) {
+  const wasPlaying = isPlaying;
+  const position = currentPosition();
+  activeMonitor = nextMonitor;
+  monitorOriginal.classList.toggle("is-active", activeMonitor === "original");
+  monitorMastered.classList.toggle("is-active", activeMonitor === "mastered");
+
+  if (wasPlaying) {
+    await playFrom(position);
+  } else {
+    playbackOffset = position;
+    updateTransport();
+  }
 }
 
 function setPreset(name) {
@@ -44,28 +168,6 @@ function setPreset(name) {
   document.querySelectorAll(".preset").forEach((button) => {
     button.classList.toggle("is-active", button.dataset.preset === name);
   });
-}
-
-function stopCurrentPlayback() {
-  if (currentSource) {
-    currentSource.stop();
-    currentSource.disconnect();
-    currentSource = null;
-  }
-}
-
-function playBuffer(buffer) {
-  stopCurrentPlayback();
-  const context = getAudioContext();
-  context.resume();
-  const source = context.createBufferSource();
-  source.buffer = buffer;
-  source.connect(context.destination);
-  source.start();
-  source.onended = () => {
-    if (currentSource === source) currentSource = null;
-  };
-  currentSource = source;
 }
 
 function drawWaveform(canvas, buffer, color, label) {
@@ -119,23 +221,46 @@ function getPeak(buffer) {
   return peak;
 }
 
-function dbToGain(db) {
-  return 10 ** (db / 20);
-}
-
-function softClip(sample, drive) {
-  return Math.tanh(sample * drive) / Math.tanh(drive);
+function getRms(buffer) {
+  let total = 0;
+  let count = 0;
+  for (let channel = 0; channel < buffer.numberOfChannels; channel += 1) {
+    const data = buffer.getChannelData(channel);
+    for (let i = 0; i < data.length; i += 1) {
+      total += data[i] * data[i];
+      count += 1;
+    }
+  }
+  return Math.sqrt(total / Math.max(count, 1));
 }
 
 function applyLimiter(buffer, ceilingDb) {
   const ceiling = dbToGain(ceilingDb);
-  const peak = getPeak(buffer);
-  const gain = peak > 0 ? Math.min(1, ceiling / peak) : 1;
+  const preLimiterPeak = getPeak(buffer);
+  const gain = preLimiterPeak > 0 ? Math.min(1, ceiling / preLimiterPeak) : 1;
+  const reductionDb = gain < 1 ? Math.abs(gainToDb(gain)) : 0;
 
   for (let channel = 0; channel < buffer.numberOfChannels; channel += 1) {
     const data = buffer.getChannelData(channel);
     for (let i = 0; i < data.length; i += 1) {
       data[i] = Math.max(-ceiling, Math.min(ceiling, data[i] * gain));
+    }
+  }
+
+  return { preLimiterPeak, gain, reductionDb, ceilingDb };
+}
+
+function gentlySaturate(buffer, amount) {
+  if (amount <= 0) return;
+  const drive = 1 + amount * 0.018;
+  const blend = Math.min(0.18, amount * 0.018);
+
+  for (let channel = 0; channel < buffer.numberOfChannels; channel += 1) {
+    const data = buffer.getChannelData(channel);
+    for (let i = 0; i < data.length; i += 1) {
+      const clean = data[i];
+      const shaped = Math.tanh(clean * drive) / Math.tanh(drive);
+      data[i] = clean * (1 - blend) + shaped * blend;
     }
   }
 }
@@ -208,107 +333,130 @@ async function masterBuffer(buffer) {
 
   const highpass = context.createBiquadFilter();
   highpass.type = "highpass";
-  highpass.frequency.value = 28;
-  highpass.Q.value = 0.7;
+  highpass.frequency.value = 26;
+  highpass.Q.value = 0.62;
 
   const lowShelf = context.createBiquadFilter();
   lowShelf.type = "lowshelf";
-  lowShelf.frequency.value = 150;
+  lowShelf.frequency.value = 135;
   lowShelf.gain.value = warmth;
+
+  const presenceDip = context.createBiquadFilter();
+  presenceDip.type = "peaking";
+  presenceDip.frequency.value = 3300;
+  presenceDip.Q.value = 0.85;
+  presenceDip.gain.value = brightness > 1 ? -0.6 : -0.25;
 
   const highShelf = context.createBiquadFilter();
   highShelf.type = "highshelf";
-  highShelf.frequency.value = 5600;
-  highShelf.gain.value = brightness;
+  highShelf.frequency.value = 7800;
+  highShelf.gain.value = brightness * 0.65;
 
   const compressor = context.createDynamicsCompressor();
-  compressor.threshold.value = -24 + glue * 0.9;
-  compressor.knee.value = 18;
-  compressor.ratio.value = 2.2 + glue * 0.28;
-  compressor.attack.value = 0.018;
-  compressor.release.value = 0.18;
+  compressor.threshold.value = -20 + glue * 0.65;
+  compressor.knee.value = 24;
+  compressor.ratio.value = 1.7 + glue * 0.18;
+  compressor.attack.value = 0.028;
+  compressor.release.value = 0.24;
 
   const makeup = context.createGain();
-  makeup.gain.value = dbToGain(2 + glue * 0.35);
+  makeup.gain.value = dbToGain(1.1 + glue * 0.23);
 
   source.connect(highpass);
   highpass.connect(lowShelf);
-  lowShelf.connect(highShelf);
+  lowShelf.connect(presenceDip);
+  presenceDip.connect(highShelf);
   highShelf.connect(compressor);
   compressor.connect(makeup);
   makeup.connect(context.destination);
   source.start();
 
   const rendered = await context.startRendering();
-  const drive = 1 + glue * 0.03;
-
-  for (let channel = 0; channel < rendered.numberOfChannels; channel += 1) {
-    const data = rendered.getChannelData(channel);
-    for (let i = 0; i < data.length; i += 1) {
-      data[i] = softClip(data[i], drive);
-    }
-  }
-
-  applyLimiter(rendered, ceiling);
+  gentlySaturate(rendered, Math.max(0, glue - 4));
+  const limiter = applyLimiter(rendered, ceiling);
+  const peak = getPeak(rendered);
+  const rms = getRms(rendered);
+  lastAnalysis = {
+    peakDb: gainToDb(peak),
+    rmsDb: gainToDb(rms),
+    limiterReductionDb: limiter.reductionDb,
+    preLimiterPeakDb: gainToDb(limiter.preLimiterPeak),
+    ceilingDb: ceiling,
+  };
   return rendered;
+}
+
+function resetMasterState() {
+  stopCurrentPlayback();
+  masteredBuffer = null;
+  lastAnalysis = null;
+  activeMonitor = "original";
+  playbackOffset = 0;
+  monitorOriginal.classList.add("is-active");
+  monitorMastered.classList.remove("is-active");
+  monitorMastered.disabled = true;
+  downloadLink.setAttribute("aria-disabled", "true");
+  downloadLink.removeAttribute("href");
+  levelText.textContent = "-";
+  reductionText.textContent = "-";
+  reductionBar.style.width = "0%";
+  drawWaveform(outputCanvas, null, "#7ec7a3", "Mastered");
+  updateTransport();
+}
+
+function setLoadedBuffer(buffer, message) {
+  sourceBuffer = buffer;
+  resetMasterState();
+  fileStatus.textContent = message;
+  processButton.disabled = false;
+  playToggleButton.disabled = false;
+  monitorOriginal.disabled = false;
+  seekBar.disabled = false;
+  drawWaveform(inputCanvas, sourceBuffer, "#f0c05a", "Original");
+  updateTransport();
 }
 
 async function loadFile(file) {
   const context = getAudioContext();
   const buffer = await file.arrayBuffer();
-  sourceBuffer = await context.decodeAudioData(buffer);
-  masteredBuffer = null;
-  fileStatus.textContent = `${file.name} を読み込みました。プリセットを選んでMaster WAVを押してください。`;
-  processButton.disabled = false;
-  playInputButton.disabled = false;
-  playOutputButton.disabled = true;
-  downloadLink.setAttribute("aria-disabled", "true");
-  downloadLink.removeAttribute("href");
-  levelText.textContent = "-";
-  drawWaveform(inputCanvas, sourceBuffer, "#f0c05a", "Original");
-  drawWaveform(outputCanvas, null, "#7ec7a3", "Mastered");
+  const decoded = await context.decodeAudioData(buffer);
+  setLoadedBuffer(decoded, `${file.name} を読み込みました。プリセットを選んでMaster WAVを押してください。`);
 }
 
 function loadDemoTone() {
   const context = getAudioContext();
   const sampleRate = context.sampleRate;
-  const seconds = 4;
+  const seconds = 8;
   const buffer = context.createBuffer(2, sampleRate * seconds, sampleRate);
 
   for (let channel = 0; channel < buffer.numberOfChannels; channel += 1) {
     const data = buffer.getChannelData(channel);
     for (let i = 0; i < data.length; i += 1) {
       const time = i / sampleRate;
-      const envelope = Math.min(1, time * 5, (seconds - time) * 4);
+      const envelope = Math.min(1, time * 4, (seconds - time) * 3);
+      const pulse = Math.sin(time * Math.PI * 2 * 2) > 0.72 ? 0.1 : 0;
       const tone =
-        Math.sin(time * Math.PI * 2 * 110) * 0.28 +
-        Math.sin(time * Math.PI * 2 * 220) * 0.18 +
-        Math.sin(time * Math.PI * 2 * 880) * 0.05;
-      data[i] = tone * envelope * (channel === 0 ? 1 : 0.95);
+        Math.sin(time * Math.PI * 2 * 82.41) * 0.24 +
+        Math.sin(time * Math.PI * 2 * 164.82) * 0.16 +
+        Math.sin(time * Math.PI * 2 * 659.25) * 0.05 +
+        pulse;
+      data[i] = tone * envelope * (channel === 0 ? 1 : 0.96);
     }
   }
 
-  sourceBuffer = buffer;
-  masteredBuffer = null;
-  fileStatus.textContent = "デモ音源を読み込みました。Master WAVで処理を試せます。";
-  processButton.disabled = false;
-  playInputButton.disabled = false;
-  playOutputButton.disabled = true;
-  downloadLink.setAttribute("aria-disabled", "true");
-  downloadLink.removeAttribute("href");
-  levelText.textContent = "-";
-  drawWaveform(inputCanvas, sourceBuffer, "#f0c05a", "Original");
-  drawWaveform(outputCanvas, null, "#7ec7a3", "Mastered");
+  setLoadedBuffer(buffer, "デモ音源を読み込みました。Master WAVで処理とA/B比較を試せます。");
 }
 
 async function processAudio() {
   if (!sourceBuffer) return;
+  stopCurrentPlayback();
   processButton.disabled = true;
   processButton.textContent = "Processing...";
   try {
     masteredBuffer = await masterBuffer(sourceBuffer);
-    const peakDb = 20 * Math.log10(Math.max(getPeak(masteredBuffer), 0.000001));
-    levelText.textContent = `${peakDb.toFixed(1)} dB`;
+    levelText.textContent = `${lastAnalysis.peakDb.toFixed(1)} dB`;
+    reductionText.textContent = `${lastAnalysis.limiterReductionDb.toFixed(1)} dB`;
+    reductionBar.style.width = `${Math.min(100, lastAnalysis.limiterReductionDb * 18)}%`;
     drawWaveform(outputCanvas, masteredBuffer, "#7ec7a3", "Mastered");
 
     if (currentObjectUrl) URL.revokeObjectURL(currentObjectUrl);
@@ -316,8 +464,9 @@ async function processAudio() {
     downloadLink.href = currentObjectUrl;
     downloadLink.download = "mastered.wav";
     downloadLink.setAttribute("aria-disabled", "false");
-    playOutputButton.disabled = false;
-    fileStatus.textContent = "マスタリングが完了しました。再生して確認し、WAVを書き出せます。";
+    monitorMastered.disabled = false;
+    await setMonitor("mastered");
+    fileStatus.textContent = `マスタリング完了。Peak ${lastAnalysis.peakDb.toFixed(1)} dB / Limiter ${lastAnalysis.limiterReductionDb.toFixed(1)} dB。OriginalとMasteredを同じ位置で切り替えられます。`;
   } catch (error) {
     fileStatus.textContent = "処理中にエラーが出ました。別のWAVファイルでもう一度試してください。";
     console.error(error);
@@ -354,8 +503,34 @@ document.querySelectorAll(".preset").forEach((button) => {
 
 processButton.addEventListener("click", processAudio);
 demoButton.addEventListener("click", loadDemoTone);
-playInputButton.addEventListener("click", () => playBuffer(sourceBuffer));
-playOutputButton.addEventListener("click", () => playBuffer(masteredBuffer));
+playToggleButton.addEventListener("click", async () => {
+  if (isPlaying) {
+    stopCurrentPlayback();
+  } else {
+    await playFrom(playbackOffset);
+  }
+});
+monitorOriginal.addEventListener("click", () => setMonitor("original"));
+monitorMastered.addEventListener("click", () => setMonitor("mastered"));
+seekBar.addEventListener("input", () => {
+  const buffer = getCurrentBuffer();
+  if (!buffer) return;
+  const position = (Number(seekBar.value) / 1000) * buffer.duration;
+  playbackOffset = position;
+  updateTransport();
+});
+seekBar.addEventListener("change", () => {
+  const buffer = getCurrentBuffer();
+  if (!buffer) return;
+  const position = (Number(seekBar.value) / 1000) * buffer.duration;
+  if (isPlaying) {
+    playFrom(position);
+  } else {
+    playbackOffset = position;
+    updateTransport();
+  }
+});
 
 drawWaveform(inputCanvas, null, "#f0c05a", "Original");
 drawWaveform(outputCanvas, null, "#7ec7a3", "Mastered");
+updateTransport();
