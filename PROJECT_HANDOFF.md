@@ -90,10 +90,12 @@ The current version addresses these by:
 - Adding A/B comparison at the same playback position.
 - Adding Peak and Limiter GR displays.
 - Adding a Limiter GR visual bar.
+- Adding a light De-click step before mastering to reduce small impulse clicks.
 - Making the default preset more conservative.
 - Adding a Streaming preset with more ceiling headroom.
 - Reducing high shelf intensity and adding a small presence dip around 3.3 kHz.
 - Making saturation much more subtle.
+- Smoothing the Demo tone pulse so it is less likely to create unintended click noise.
 
 ## 5. Current UI
 
@@ -163,7 +165,9 @@ async function masterBuffer(buffer)
 Current signal chain:
 
 ```text
-AudioBufferSource
+Input WAV buffer
+  -> Light De-click preparation
+  -> AudioBufferSource
   -> High-pass filter
   -> Low shelf EQ
   -> Presence dip EQ
@@ -177,6 +181,14 @@ AudioBufferSource
 ```
 
 Detailed processing:
+
+- De-click:
+  - Function: `deClickBuffer(buffer)`
+  - Runs on a copied buffer before the EQ/compressor chain.
+  - Detects obvious one-sample impulse spikes by looking for a large jump into and out of a sample.
+  - Repairs only the detected sample by blending it toward the average of its neighbors.
+  - Purpose: reduce small accidental `click` or `pop` noise without softening the whole track.
+  - Important: this is intentionally light. It is not a full spectral repair or restoration tool.
 
 - High-pass:
   - Type: `highpass`
@@ -300,10 +312,12 @@ lastAnalysis = {
   limiterReductionDb,
   preLimiterPeakDb,
   ceilingDb,
+  deClickRepairs,
 };
 ```
 
 Current UI only shows `peakDb` and `limiterReductionDb`.
+`deClickRepairs` is kept in the analysis object for debugging and future UI work, but is not shown to the user yet.
 
 Potential future UI:
 
@@ -341,7 +355,7 @@ Purpose:
 - Allows testing without a user-provided WAV.
 - Helps verify mastering, waveform, A/B, and download flow.
 
-Current demo tone is synthetic and not a real music master. Do not use it as proof of mastering quality.
+The demo tone originally used a sharper pulse that could sound like unintended noise. It now uses a smoother pulse shape. Current demo tone is still synthetic and not a real music master. Do not use it as proof of mastering quality.
 
 ## 12. Styling And Layout
 
@@ -441,6 +455,7 @@ Initial commit:
 Audio limitations:
 
 - Limiter is not a professional lookahead or true-peak limiter.
+- De-click is light impulse smoothing only, not full audio restoration.
 - Loudness is not measured in LUFS.
 - Export is 16-bit PCM WAV with no dithering.
 - No oversampling.
@@ -467,10 +482,11 @@ Browser limitations:
 High priority:
 
 1. Replace the simple peak limiter with a real lookahead limiter.
-2. Add approximate LUFS or at least integrated RMS/loudness display.
-3. Add a clear warning when Limiter GR is too high, such as over `3 dB`.
-4. Add a `Bypass` label or keyboard shortcut for A/B.
-5. Add a visual marker showing current playback position on both waveforms.
+2. Improve De-click into a safer multi-sample click repair and add a clear on/off control if needed.
+3. Add approximate LUFS or at least integrated RMS/loudness display.
+4. Add a clear warning when Limiter GR is too high, such as over `3 dB`.
+5. Add a `Bypass` label or keyboard shortcut for A/B.
+6. Add a visual marker showing current playback position on both waveforms.
 
 Medium priority:
 
@@ -507,9 +523,11 @@ Before changing audio behavior:
   - A loud file.
   - A bright vocal-heavy file.
   - A bass-heavy file.
+  - A file with obvious small clicks or pops.
 - Compare Original and Mastered at the same playback position.
 - Check that default Balanced does not feel harsh.
 - Check that Streaming leaves enough headroom.
+- Check that De-click reduces accidental clicks without dulling drum attacks.
 
 ## 18. Important User Context
 

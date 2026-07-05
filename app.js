@@ -234,6 +234,49 @@ function getRms(buffer) {
   return Math.sqrt(total / Math.max(count, 1));
 }
 
+function copyAudioBuffer(context, buffer) {
+  const copy = context.createBuffer(
+    buffer.numberOfChannels,
+    buffer.length,
+    buffer.sampleRate,
+  );
+
+  for (let channel = 0; channel < buffer.numberOfChannels; channel += 1) {
+    copy.getChannelData(channel).set(buffer.getChannelData(channel));
+  }
+
+  return copy;
+}
+
+function deClickBuffer(buffer) {
+  const threshold = 0.24;
+  let repairs = 0;
+
+  for (let channel = 0; channel < buffer.numberOfChannels; channel += 1) {
+    const data = buffer.getChannelData(channel);
+    const source = new Float32Array(data);
+
+    for (let i = 1; i < source.length - 1; i += 1) {
+      const previous = source[i - 1];
+      const current = source[i];
+      const next = source[i + 1];
+      const jumpIn = Math.abs(current - previous);
+      const jumpOut = Math.abs(next - current);
+      const isImpulse =
+        jumpIn > threshold &&
+        jumpOut > threshold &&
+        Math.sign(current - previous) !== Math.sign(next - current);
+
+      if (isImpulse) {
+        data[i] = current * 0.15 + ((previous + next) / 2) * 0.85;
+        repairs += 1;
+      }
+    }
+  }
+
+  return repairs;
+}
+
 function applyLimiter(buffer, ceilingDb) {
   const ceiling = dbToGain(ceilingDb);
   const preLimiterPeak = getPeak(buffer);
@@ -327,9 +370,11 @@ async function masterBuffer(buffer) {
     buffer.length,
     buffer.sampleRate,
   );
+  const preparedBuffer = copyAudioBuffer(context, buffer);
+  const deClickRepairs = deClickBuffer(preparedBuffer);
 
   const source = context.createBufferSource();
-  source.buffer = buffer;
+  source.buffer = preparedBuffer;
 
   const highpass = context.createBiquadFilter();
   highpass.type = "highpass";
@@ -382,6 +427,7 @@ async function masterBuffer(buffer) {
     limiterReductionDb: limiter.reductionDb,
     preLimiterPeakDb: gainToDb(limiter.preLimiterPeak),
     ceilingDb: ceiling,
+    deClickRepairs,
   };
   return rendered;
 }
@@ -434,7 +480,8 @@ function loadDemoTone() {
     for (let i = 0; i < data.length; i += 1) {
       const time = i / sampleRate;
       const envelope = Math.min(1, time * 4, (seconds - time) * 3);
-      const pulse = Math.sin(time * Math.PI * 2 * 2) > 0.72 ? 0.1 : 0;
+      const pulsePhase = (time * 2) % 1;
+      const pulse = pulsePhase < 0.18 ? Math.sin((pulsePhase / 0.18) * Math.PI) * 0.055 : 0;
       const tone =
         Math.sin(time * Math.PI * 2 * 82.41) * 0.24 +
         Math.sin(time * Math.PI * 2 * 164.82) * 0.16 +
